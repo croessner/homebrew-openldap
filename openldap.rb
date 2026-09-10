@@ -1,34 +1,42 @@
+# typed: strict
+# frozen_string_literal: true
+
 # Based on Homebrew/homebrew-core's OpenLDAP formula (BSD-2-Clause).
 class Openldap < Formula
-  desc "OpenLDAP with SSHA512 password defaults and optional Argon2id support"
+  desc "Directory server with SSHA512 password defaults and optional Argon2id support"
   homepage "https://www.openldap.org/software/"
   url "https://www.openldap.org/software/download/OpenLDAP/openldap-release/openldap-2.7.1.tgz"
   sha256 "253db80f301258ea69cda1184766d57395b836aaabf41157eb0316eb0fac1341"
   license "OLDAP-2.8"
-
-  keg_only :provided_by_macos
-
-  depends_on :macos
-  depends_on "argon2"
-  depends_on "libtool"
-  depends_on "openssl@3"
-  on_macos do
-    depends_on "llvm@22" => :build
-  end
-  uses_from_macos "mandoc" => :build
-  uses_from_macos "cyrus-sasl"
 
   livecheck do
     url "https://www.openldap.org/software/download/"
     regex(/Feature Release.*?OpenLDAP[ -](\d+\.\d+\.\d+)/im)
   end
 
+  keg_only :provided_by_macos
+
+  depends_on "argon2"
+  depends_on "libtool"
+  depends_on :macos
+  depends_on "openssl@3"
+  uses_from_macos "mandoc" => :build
+  uses_from_macos "cyrus-sasl"
+
+  on_macos do
+    depends_on "llvm@22" => :build
+  end
+
   def install
     if OS.mac?
-      ENV["CC"] = Formula["llvm@22"].opt_bin/"clang"
-      ENV["CXX"] = Formula["llvm@22"].opt_bin/"clang++"
+      ENV["CC"] = formula_opt_bin("llvm@22")/"clang"
+      ENV["CXX"] = formula_opt_bin("llvm@22")/"clang++"
       # Upstream libtool recognizes 10.x but also needs modern macOS versions.
       inreplace "configure", "\t10.*)", "\t*)"
+    end
+    %w[argon2 libtool openssl@3].each do |dependency|
+      ENV.append "CPPFLAGS", "-I#{formula_opt_include(dependency)}"
+      ENV.append "LDFLAGS", "-L#{formula_opt_lib(dependency)}"
     end
     args = %W[
       --prefix=#{prefix}
@@ -100,9 +108,11 @@ class Openldap < Formula
   end
 
   test do
-    sha = shell_output("#{sbin}/slappasswd -o module-path=#{libexec}/openldap -o module-load=pw-sha2 -h '{SSHA512}' -s fixture-only")
+    sha = shell_output("#{sbin}/slappasswd -o module-path=#{libexec}/openldap " \
+                       "-o module-load=pw-sha2 -h '{SSHA512}' -s fixture-only")
     assert_match "{SSHA512}", sha
-    argon = shell_output("#{sbin}/slappasswd -o module-path=#{libexec}/openldap -o module-load=argon2 -h '{ARGON2}' -s fixture-only")
+    argon = shell_output("#{sbin}/slappasswd -o module-path=#{libexec}/openldap " \
+                         "-o module-load=argon2 -h '{ARGON2}' -s fixture-only")
     assert_match "{ARGON2}$argon2id$", argon
     system RbConfig.ruby, tap.path/"tests/smoke.rb", prefix
   end
