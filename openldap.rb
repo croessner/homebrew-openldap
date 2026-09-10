@@ -31,6 +31,8 @@ class Openldap < Formula
     if OS.mac?
       ENV["CC"] = formula_opt_bin("llvm@22")/"clang"
       ENV["CXX"] = formula_opt_bin("llvm@22")/"clang++"
+      # Password modules resolve lutil_passwd_add from the slapd executable.
+      ENV.append "LDFLAGS", "-Wl,-export_dynamic"
       # Upstream libtool recognizes 10.x but also needs modern macOS versions.
       inreplace "configure", "\t10.*)", "\t*)"
     end
@@ -70,7 +72,7 @@ class Openldap < Formula
     system "make", "depend"
     system "make"
     soelim = OS.mac? ? "mandoc_soelim" : "soelim"
-    system "make", "install", "SOELIM=#{soelim}"
+    system "make", "install", "SOELIM=#{soelim}", "STRIP_OPTS="
     system "make", "-C", "contrib/slapd-modules/passwd/sha2", "install",
            "CC=#{ENV.cc}", "prefix=#{prefix}", "moduledir=#{libexec}/openldap"
     (pkgshare/"schema").install Dir["servers/slapd/schema/*.schema"]
