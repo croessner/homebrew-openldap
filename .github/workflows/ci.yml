@@ -32,10 +32,13 @@ jobs:
           if brew command trust >/dev/null 2>&1; then brew trust --formula croessner/openldap/openldap; fi
           brew tap --custom-remote croessner/openldap "$GITHUB_WORKSPACE"
           test "$(git -C "$(brew --repository croessner/openldap)" rev-parse HEAD)" = "$(git rev-parse HEAD)"
+          mkdir -p "$(brew --prefix)/etc/openldap/schema"
+          printf '%s\n' '# custom schema preservation probe' > "$(brew --prefix)/etc/openldap/schema/tap-preservation-probe.schema"
           if brew list --versions openldap >/dev/null 2>&1; then
             brew reinstall --build-from-source croessner/openldap/openldap
           else
             brew install --build-from-source croessner/openldap/openldap
           fi
+          test "$(cat "$(brew --prefix)/etc/openldap/schema/tap-preservation-probe.schema")" = '# custom schema preservation probe'
       - name: Verify password schemes and real LDAP operations
         run: brew test croessner/openldap/openldap

@@ -33,7 +33,9 @@ include /usr/local/opt/openldap/share/openldap/password-modules.conf
 
 On Apple Silicon replace `/usr/local` with `/opt/homebrew`. The fragment loads
 `pw-sha2` and `argon2`, then sets **`password-hash {SSHA512}`**. Existing configuration
-is deliberately preserved during installation and upgrades. Include this fragment
+is deliberately preserved during installation and upgrades. Bundled schemas live
+in the keg; active schemas and custom files under `etc/openldap/schema` remain in
+place. Updated reference schemas are supplied as `.default` files for review. Include this fragment
 once; remove conflicting duplicate module or password-hash directives first.
 
 SSHA512 is the server default for RFC 3062 Password Modify operations. Existing

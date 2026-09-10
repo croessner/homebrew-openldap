@@ -8,6 +8,7 @@ class Openldap < Formula
   url "https://www.openldap.org/software/download/OpenLDAP/openldap-release/openldap-2.7.1.tgz"
   sha256 "253db80f301258ea69cda1184766d57395b836aaabf41157eb0316eb0fac1341"
   license "OLDAP-2.8"
+  revision 1
 
   livecheck do
     url "https://www.openldap.org/software/download/"
@@ -72,10 +73,20 @@ class Openldap < Formula
     soelim = OS.mac? ? "mandoc_soelim" : "soelim"
     system "make", "depend", "SOELIM=#{soelim}"
     system "make", "SOELIM=#{soelim}"
-    system "make", "install", "SOELIM=#{soelim}", "STRIP_OPTS="
+    system "make", "install", "SOELIM=#{soelim}", "STRIP_OPTS=", "schemadir=#{pkgshare}/schema"
     system "make", "-C", "contrib/slapd-modules/passwd/sha2", "install",
            "CC=#{ENV.cc}", "prefix=#{prefix}", "moduledir=#{libexec}/openldap"
-    (pkgshare/"schema").install Dir["servers/slapd/schema/*.schema"]
+    # Upstream install-schema moves the entire old directory aside. Install
+    # bundled schemas into the keg; preserve every active/custom schema in etc.
+    schema_dir = etc/"openldap/schema"
+    schema_dir.mkpath
+    (pkgshare/"schema").children.each do |source|
+      next unless source.file?
+
+      target = schema_dir/source.basename
+      target = Pathname.new("#{target}.default") if target.exist? || target.symlink?
+      cp source, target
+    end
     (var/"run").mkpath
     (var/"openldap-data").mkpath
     # Homebrew preserves existing configuration. Supply an explicit fragment;
