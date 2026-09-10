@@ -29,9 +29,9 @@ jobs:
       - name: Install this exact tap revision
         run: |
           set -euo pipefail
+          if brew command trust >/dev/null 2>&1; then brew trust --formula croessner/openldap/openldap; fi
           brew tap --custom-remote croessner/openldap "$GITHUB_WORKSPACE"
           test "$(git -C "$(brew --repository croessner/openldap)" rev-parse HEAD)" = "$(git rev-parse HEAD)"
-          if brew command trust >/dev/null 2>&1; then brew trust --formula croessner/openldap/openldap; fi
           if brew list --versions openldap >/dev/null 2>&1; then
             brew reinstall --build-from-source croessner/openldap/openldap
           else
