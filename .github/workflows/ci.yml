@@ -1,0 +1,41 @@
+name: Build and test
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      HOMEBREW_NO_INSTALL_CLEANUP: '1'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Check scripts
+        run: |
+          python3 -m py_compile scripts/check-upstream.py
+          ruby -c openldap.rb
+          ruby -c tests/smoke.rb
+      - name: Install this exact tap revision
+        run: |
+          set -euo pipefail
+          brew tap --custom-remote croessner/openldap "$GITHUB_WORKSPACE"
+          test "$(git -C "$(brew --repository croessner/openldap)" rev-parse HEAD)" = "$(git rev-parse HEAD)"
+          if brew command trust >/dev/null 2>&1; then brew trust --formula croessner/openldap/openldap; fi
+          if brew list --versions openldap >/dev/null 2>&1; then
+            brew reinstall --build-from-source croessner/openldap/openldap
+          else
+            brew install --build-from-source croessner/openldap/openldap
+          fi
+      - name: Verify password schemes and real LDAP operations
+        run: brew test croessner/openldap/openldap

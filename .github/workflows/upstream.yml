@@ -1,0 +1,46 @@
+name: Check upstream release
+on:
+  schedule:
+    - cron: '41 5 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+concurrency:
+  group: upstream-release
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Verify official release and update source pin
+        id: upstream
+        run: python3 scripts/check-upstream.py
+      - name: Open or update release PR
+        if: steps.upstream.outputs.changed == 'true'
+        id: pr
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
+        with:
+          branch: automation/openldap-release
+          delete-branch: true
+          add-paths: openldap.rb
+          commit-message: 'chore: update OpenLDAP to ${{ steps.upstream.outputs.version }}'
+          title: 'chore: update OpenLDAP to ${{ steps.upstream.outputs.version }}'
+          assignees: croessner
+          body: |
+            Updates the official OpenLDAP Feature Release source pin.
+
+            - Upstream SHA3-512 verified; Formula SHA-256: `${{ steps.upstream.outputs.sha256 }}`.
+            - SSHA512 remains the default; Argon2id remains optional.
+            - Review upstream release notes and database-format migration requirements before merging.
+            - No automatic merge or local service restart.
+      # GITHUB_TOKEN-created PRs do not trigger pull_request workflows.
+      # Dispatch explicitly against the bot branch so both architectures are built.
+      - name: Dispatch builds for the update branch
+        if: steps.pr.outputs.pull-request-operation == 'created' || steps.pr.outputs.pull-request-operation == 'updated'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref automation/openldap-release
