@@ -69,9 +69,9 @@ class Openldap < Formula
       --enable-valsort
     ]
     system "./configure", *args
-    system "make", "depend"
-    system "make"
     soelim = OS.mac? ? "mandoc_soelim" : "soelim"
+    system "make", "depend", "SOELIM=#{soelim}"
+    system "make", "SOELIM=#{soelim}"
     system "make", "install", "SOELIM=#{soelim}", "STRIP_OPTS="
     system "make", "-C", "contrib/slapd-modules/passwd/sha2", "install",
            "CC=#{ENV.cc}", "prefix=#{prefix}", "moduledir=#{libexec}/openldap"
