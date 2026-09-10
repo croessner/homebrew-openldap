@@ -67,10 +67,20 @@ Dir.mktmpdir("ldap-tap-", "/tmp") do |dir|
   command("#{prefix}/sbin/slapadd", "-f", "#{dir}/slapd.conf", "-l", "#{dir}/seed.ldif")
   pid = Process.spawn("#{prefix}/libexec/slapd", "-d", "0", "-f", "#{dir}/slapd.conf", "-h", uri, out: "#{dir}/server.log", err: [:child, :out])
   begin
-    Timeout.timeout(15) { sleep 0.1 until File.socket?(socket) }
     ldap = ["-H", uri]
     who = "#{prefix}/bin/ldapwhoami"
-    raise "EXTERNAL mapping failed" unless command(who, *ldap, "-Q", "-Y", "EXTERNAL").include?(admin)
+    # The socket inode appears before slapd starts accepting connections.
+    Timeout.timeout(30) do
+      loop do
+        out, _, status = Open3.capture3(who, *ldap, "-Q", "-Y", "EXTERNAL")
+        if status.success?
+          raise "EXTERNAL mapping failed" unless out.include?(admin)
+          break
+        end
+        raise "Test server exited: #{File.read("#{dir}/server.log")}" if Process.waitpid(pid, Process::WNOHANG)
+        sleep 0.1
+      end
+    end
     command(who, *ldap, "-x", "-D", user, "-w", "fixture-initial")
     command(who, *ldap, "-x", "-D", "uid=argon,#{base}", "-w", "fixture-argon")
     command("#{prefix}/bin/ldappasswd", *ldap, "-x", "-D", admin, "-w", "fixture-admin", "-s", "fixture-changed", user)
