@@ -75,9 +75,8 @@ Dir.mktmpdir("ldap-tap-", "/tmp") do |dir|
     command(who, *ldap, "-x", "-D", "uid=argon,#{base}", "-w", "fixture-argon")
     command("#{prefix}/bin/ldappasswd", *ldap, "-x", "-D", admin, "-w", "fixture-admin", "-s", "fixture-changed", user)
     out = command("#{prefix}/bin/ldapsearch", *ldap, "-LLL", "-o", "ldif-wrap=no", "-x", "-D", admin, "-w", "fixture-admin", "-b", user, "-s", "base", "userPassword")
-    require "base64"
     encoded = out.lines.find { |l| l.start_with?("userPassword:: ") }
-    value = encoded ? Base64.decode64(encoded.split(":: ", 2).last) : out.lines.find { |l| l.start_with?("userPassword: ") }.to_s.split(": ", 2).last.to_s
+    value = encoded ? encoded.split(":: ", 2).last.unpack1("m") : out.lines.find { |l| l.start_with?("userPassword: ") }.to_s.split(": ", 2).last.to_s
     raise "RFC3062 did not generate SSHA512" unless value.start_with?("{SSHA512}")
     command(who, *ldap, "-x", "-D", user, "-w", "fixture-changed")
     _, _, bad = Open3.capture3(who, *ldap, "-x", "-D", user, "-w", "fixture-initial")
